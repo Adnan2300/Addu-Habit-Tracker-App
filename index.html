@@ -38,13 +38,29 @@
     <form id="add-habit-form">
       <input type="text" id="habit-input" placeholder="New habit name..." required>
       <div class="form-row">
-        <input type="text" id="habit-category" placeholder="Category (e.g. Health)">
+        <!-- Category input with pre-filled suggestions -->
+        <input type="text" id="habit-category" list="category-options" placeholder="Category (or select below)">
+        <datalist id="category-options">
+          <option value="Health">
+          <option value="Fitness">
+          <option value="Productivity">
+          <option value="Mindfulness">
+          <option value="Finance">
+        </datalist>
+
+        <!-- Frequency options with custom choice -->
         <select id="habit-frequency">
           <option value="Daily">Daily</option>
           <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+          <option value="Custom">Custom...</option>
         </select>
+
         <button type="submit" class="add-btn">+</button>
       </div>
+
+      <!-- Custom Frequency Field (revealed when Custom is chosen) -->
+      <input type="text" id="custom-frequency-input" class="hidden-field" placeholder="Enter custom schedule (e.g. 3x a week, Every Mon/Thu)">
     </form>
 
     <div class="filter-bar" id="filter-bar">
