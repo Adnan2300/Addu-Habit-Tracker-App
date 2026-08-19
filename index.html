@@ -2,94 +2,73 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Habit Tracker</title>
-  <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#000000">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app-container">
     <header>
       <div class="header-top">
-        <div>
-          <h1>Habits 🎉</h1>
-          <p id="current-date"></p>
-        </div>
-        <button id="theme-toggle" class="icon-btn" title="Toggle Theme">🌙</button>
-      </div>
-
-      <!-- Analytics Banner -->
-      <div class="analytics-card">
-        <div class="stat">
-          <span id="stat-total">0</span>
-          <label>Total Habits</label>
-        </div>
-        <div class="stat">
-          <span id="stat-rate">0%</span>
-          <label>Today's Rate</label>
-        </div>
-        <div class="stat">
-          <span id="stat-best">0</span>
-          <label>Best Streak</label>
+        <h1>Habits</h1>
+        <div class="header-actions">
+          <button id="calendar-btn" class="icon-btn" aria-label="Open Calendar">📅</button>
+          <button id="theme-btn" class="icon-btn" aria-label="Toggle Theme">🌙</button>
         </div>
       </div>
+      <p id="current-date">Today</p>
     </header>
 
-    <!-- Habit Creation Form with Custom Tag Support -->
+    <div class="analytics-card">
+      <div class="stat">
+        <span id="stat-total">0</span>
+        <label>Habits</label>
+      </div>
+      <div class="stat">
+        <span id="stat-completed">0</span>
+        <label>Completed</label>
+      </div>
+      <div class="stat">
+        <span id="stat-streak">0</span>
+        <label>Best Streak</label>
+      </div>
+    </div>
+
     <form id="add-habit-form">
       <input type="text" id="habit-input" placeholder="New habit name..." required>
       <div class="form-row">
-        <!-- Custom or Select Category -->
-        <input type="text" id="habit-category" list="category-options" placeholder="Category (or type custom)" required>
-        <datalist id="category-options">
-          <option value="Fitness"></option>
-          <option value="Study"></option>
-          <option value="Mindfulness"></option>
-          <option value="Work"></option>
-          <option value="General"></option>
-        </datalist>
-
-        <!-- Custom or Select Duration/Frequency -->
-        <input type="text" id="habit-frequency" list="frequency-options" placeholder="Frequency" required>
-        <datalist id="frequency-options">
-          <option value="Daily"></option>
-          <option value="3x/week"></option>
-          <option value="Weekdays"></option>
-          <option value="Weekends"></option>
-        </datalist>
-
+        <input type="text" id="habit-category" placeholder="Category (e.g. Health)">
+        <select id="habit-frequency">
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+        </select>
         <button type="submit" class="add-btn">+</button>
       </div>
     </form>
 
-    <!-- Dynamic Category Filter Bar -->
-    <div id="filter-bar" class="filter-bar">
-      <button class="filter-btn active" data-category="All">All</button>
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-btn active" data-filter="All">All</button>
     </div>
 
-    <!-- Habit Cards List -->
-    <main id="habit-list" class="habit-list"></main>
-
-    <!-- Backup / Restore Controls -->
-    <footer class="data-management">
-      <button id="export-btn" class="secondary-btn">📦 Export Data</button>
-      <label for="import-file" class="secondary-btn">📥 Restore Data</label>
-      <input type="file" id="import-file" accept=".json" style="display: none;">
-    </footer>
+    <div id="habit-list"></div>
   </div>
 
-  <div id="confetti-container"></div>
+  <!-- Streak Calendar Modal -->
+  <div id="calendar-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="calendar-month-title">Streak Calendar</h2>
+        <button id="close-modal-btn" class="close-btn">✕</button>
+      </div>
+      <div class="calendar-grid" id="calendar-grid"></div>
+      <div class="cal-details-card">
+        <h4 id="selected-date-text">Select a day</h4>
+        <p id="selected-stats-text">Tap any date to inspect completion performance.</p>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(() => console.log('Service Worker Registered'))
-        .catch(err => console.error('SW Registration Failed:', err));
-    }
-  </script>
 </body>
 </html>
