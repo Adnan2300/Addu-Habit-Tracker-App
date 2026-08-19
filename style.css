@@ -123,7 +123,7 @@ header p {
   margin-bottom: 20px;
 }
 
-#habit-input, #habit-category, #habit-frequency {
+#habit-input, #habit-category, #habit-frequency, #custom-frequency-input {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 14px;
@@ -133,12 +133,17 @@ header p {
   outline: none;
 }
 
-#habit-input:focus, #habit-category:focus, #habit-frequency:focus {
+#habit-input:focus, #habit-category:focus, #habit-frequency:focus, #custom-frequency-input:focus {
   border-color: var(--accent);
 }
 
 .form-row { display: flex; gap: 8px; }
-.form-row input { flex: 1; min-width: 0; }
+.form-row input { flex: 1.2; min-width: 0; }
+.form-row select { flex: 0.9; min-width: 0; }
+
+.hidden-field {
+  display: none;
+}
 
 .add-btn {
   background: var(--accent);
