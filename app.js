@@ -1,222 +1,206 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const currentDateEl = document.getElementById('current-date');
-  const habitForm = document.getElementById('add-habit-form');
-  const habitInput = document.getElementById('habit-input');
-  const habitCategory = document.getElementById('habit-category');
-  const habitFrequency = document.getElementById('habit-frequency');
-  const habitList = document.getElementById('habit-list');
-  const themeToggle = document.getElementById('theme-toggle');
-  const filterBar = document.getElementById('filter-bar');
-  const exportBtn = document.getElementById('export-btn');
-  const importFile = document.getElementById('import-file');
+let habits = JSON.parse(localStorage.getItem('habits_data')) || [];
+let activeFilter = 'All';
 
-  const today = new Date().toISOString().split('T')[0];
-  currentDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+// Elements
+const habitList = document.getElementById('habit-list');
+const habitForm = document.getElementById('add-habit-form');
+const calendarBtn = document.getElementById('calendar-btn');
+const themeBtn = document.getElementById('theme-btn');
+const calendarModal = document.getElementById('calendar-modal');
+const closeModalBtn = document.getElementById('close-modal-btn');
+const calendarGrid = document.getElementById('calendar-grid');
 
-  let habits = JSON.parse(localStorage.getItem('my_habits')) || [];
-  let activeCategory = 'All';
+// Format date string as YYYY-MM-DD
+function getFormattedDate(dateObj = new Date()) {
+  return dateObj.toISOString().split('T')[0];
+}
 
-  // Theme Handling
-  if (localStorage.getItem('theme') === 'light') {
-    document.body.classList.add('light-mode');
-    themeToggle.textContent = '☀️';
-  }
+const todayStr = getFormattedDate();
 
-  themeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('light-mode');
-    const isLight = document.body.classList.contains('light-mode');
-    themeToggle.textContent = isLight ? '☀️' : '🌙';
-    localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  });
-
-  function saveHabits() {
-    localStorage.setItem('my_habits', JSON.stringify(habits));
-    render();
-  }
-
-  function calculateStreak(habit) {
-    if (!habit.completedDates.length) return 0;
-    const sorted = [...habit.completedDates].sort().reverse();
-    let streak = 0;
-    let checkDate = new Date();
-
-    const todayStr = checkDate.toISOString().split('T')[0];
-    checkDate.setDate(checkDate.getDate() - 1);
-    const yesterdayStr = checkDate.toISOString().split('T')[0];
-
-    if (!sorted.includes(todayStr) && !sorted.includes(yesterdayStr)) return 0;
-
-    let cursor = new Date(sorted.includes(todayStr) ? todayStr : yesterdayStr);
-    while (true) {
-      const dateStr = cursor.toISOString().split('T')[0];
-      if (sorted.includes(dateStr)) {
-        streak++;
-        cursor.setDate(cursor.getDate() - 1);
-      } else break;
-    }
-    return streak;
-  }
-
-  function triggerConfetti() {
-    const container = document.getElementById('confetti-container');
-    const colors = ['#30d158', '#007aff', '#ff9500', '#ff2d55', '#af52de'];
-    for (let i = 0; i < 35; i++) {
-      const piece = document.createElement('div');
-      piece.className = 'confetti-piece';
-      piece.style.left = Math.random() * 100 + 'vw';
-      piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-      piece.style.animationDuration = (1 + Math.random() * 0.8) + 's';
-      container.appendChild(piece);
-      setTimeout(() => piece.remove(), 2000);
-    }
-  }
-
-  function updateFilterBar() {
-    // Extract unique categories dynamically
-    const categories = ['All', ...new Set(habits.map(h => h.category).filter(Boolean))];
-    filterBar.innerHTML = '';
-    categories.forEach(cat => {
-      const btn = document.createElement('button');
-      btn.className = `filter-btn ${cat === activeCategory ? 'active' : ''}`;
-      btn.dataset.category = cat;
-      btn.textContent = cat;
-      filterBar.appendChild(btn);
-    });
-  }
-
-  function updateAnalytics() {
-    document.getElementById('stat-total').textContent = habits.length;
-    const completedToday = habits.filter(h => h.completedDates.includes(today)).length;
-    const rate = habits.length ? Math.round((completedToday / habits.length) * 100) : 0;
-    document.getElementById('stat-rate').textContent = `${rate}%`;
-
-    const bestStreak = habits.reduce((max, h) => Math.max(max, calculateStreak(h)), 0);
-    document.getElementById('stat-best').textContent = bestStreak;
-  }
-
-  function renderHeatmap(habit) {
-    let html = '<div class="heatmap">';
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'narrow' });
-      const isFilled = habit.completedDates.includes(dateStr);
-
-      html += `
-        <div class="day-box">
-          <span class="day-label">${dayName}</span>
-          <div class="dot ${isFilled ? 'filled' : ''}"></div>
-        </div>
-      `;
-    }
-    html += '</div>';
-    return html;
-  }
-
-  function render() {
-    updateFilterBar();
-    updateAnalytics();
-    habitList.innerHTML = '';
-
-    const filtered = activeCategory === 'All' 
-      ? habits 
-      : habits.filter(h => h.category === activeCategory);
-
-    filtered.forEach((habit) => {
-      const realIndex = habits.indexOf(habit);
-      const isCompletedToday = habit.completedDates.includes(today);
-      const streak = calculateStreak(habit);
-
-      const card = document.createElement('div');
-      card.className = 'habit-card';
-      card.innerHTML = `
-        <div class="card-header">
-          <div>
-            <span class="habit-title">${habit.name}</span>
-            <div class="badges">
-              <span class="badge">${habit.category}</span>
-              <span class="badge" style="opacity: 0.7">${habit.frequency}</span>
-            </div>
-          </div>
-          <div class="card-actions">
-            <button class="check-btn ${isCompletedToday ? 'completed' : ''}" onclick="toggleHabit(${realIndex})">✓</button>
-            <button class="delete-btn" onclick="deleteHabit(${realIndex})">✕</button>
-          </div>
-        </div>
-        <div style="font-size: 12px; color: var(--text-sub);">🔥 ${streak} day streak</div>
-        ${renderHeatmap(habit)}
-      `;
-      habitList.appendChild(card);
-    });
-  }
-
-  filterBar.addEventListener('click', (e) => {
-    if (e.target.classList.contains('filter-btn')) {
-      activeCategory = e.target.dataset.category;
-      render();
-    }
-  });
-
-  exportBtn.addEventListener('click', () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(habits));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `habits_backup_${today}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  });
-
-  importFile.addEventListener('change', (e) => {
-    const fileReader = new FileReader();
-    fileReader.onload = (event) => {
-      try {
-        const importedHabits = JSON.parse(event.target.result);
-        if (Array.isArray(importedHabits)) {
-          habits = importedHabits;
-          saveHabits();
-        }
-      } catch (err) {
-        alert('Invalid file format.');
-      }
-    };
-    if (e.target.files[0]) fileReader.readAsText(e.target.files[0]);
-  });
-
-  window.toggleHabit = (index) => {
-    const habit = habits[index];
-    const dateIdx = habit.completedDates.indexOf(today);
-    if (dateIdx > -1) {
-      habit.completedDates.splice(dateIdx, 1);
-    } else {
-      habit.completedDates.push(today);
-      // Trigger confetti if all habits completed today
-      const completedCount = habits.filter(h => h.completedDates.includes(today)).length;
-      if (completedCount === habits.length) triggerConfetti();
-    }
-    saveHabits();
-  };
-
-  window.deleteHabit = (index) => {
-    habits.splice(index, 1);
-    saveHabits();
-  };
-
-  habitForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const name = habitInput.value.trim();
-    const category = habitCategory.value.trim() || 'General';
-    const frequency = habitFrequency.value.trim() || 'Daily';
-
-    if (name) {
-      habits.push({ name, category, frequency, completedDates: [] });
-      habitInput.value = '';
-      habitCategory.value = '';
-      habitFrequency.value = '';
-      saveHabits();
-    }
-  });
-
-  render();
+// Initialize App
+document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-US', {
+  weekday: 'long', month: 'short', day: 'numeric'
 });
+
+// Add Habit
+habitForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const title = document.getElementById('habit-input').value.trim();
+  const category = document.getElementById('habit-category').value.trim() || 'General';
+  const frequency = document.getElementById('habit-frequency').value;
+
+  if (!title) return;
+
+  const newHabit = {
+    id: Date.now(),
+    title,
+    category,
+    frequency,
+    history: {} // Store "YYYY-MM-DD": true
+  };
+
+  habits.push(newHabit);
+  saveAndRender();
+  habitForm.reset();
+});
+
+// Toggle Habit Completion
+function toggleHabit(id) {
+  habits = habits.map(h => {
+    if (h.id === id) {
+      const updatedHistory = { ...h.history };
+      if (updatedHistory[todayStr]) {
+        delete updatedHistory[todayStr];
+      } else {
+        updatedHistory[todayStr] = true;
+      }
+      return { ...h, history: updatedHistory };
+    }
+    return h;
+  });
+  saveAndRender();
+}
+
+// Delete Habit
+function deleteHabit(id) {
+  habits = habits.filter(h => h.id !== id);
+  saveAndRender();
+}
+
+// Calculate Streaks
+function getStreak(history) {
+  let streak = 0;
+  let checkDate = new Date();
+  
+  while (true) {
+    const dateKey = getFormattedDate(checkDate);
+    if (history[dateKey]) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+// Save & Render
+function saveAndRender() {
+  localStorage.setItem('habits_data', JSON.stringify(habits));
+  renderAnalytics();
+  renderHabits();
+}
+
+function renderAnalytics() {
+  document.getElementById('stat-total').innerText = habits.length;
+  const completedToday = habits.filter(h => h.history[todayStr]).length;
+  document.getElementById('stat-completed').innerText = completedToday;
+
+  let maxStreak = 0;
+  habits.forEach(h => {
+    const s = getStreak(h.history);
+    if (s > maxStreak) maxStreak = s;
+  });
+  document.getElementById('stat-streak').innerText = maxStreak;
+}
+
+function renderHabits() {
+  habitList.innerHTML = '';
+  const filtered = activeFilter === 'All' ? habits : habits.filter(h => h.category === activeFilter);
+
+  filtered.forEach(habit => {
+    const isDone = !!habit.history[todayStr];
+    const streak = getStreak(habit.history);
+
+    const card = document.createElement('div');
+    card.className = 'habit-card';
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="habit-title">${habit.title}</div>
+          <div class="badges">
+            <span class="badge">${habit.category}</span>
+            <span class="badge">${habit.frequency}</span>
+            <span class="badge">🔥 ${streak}d streak</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="check-btn ${isDone ? 'completed' : ''}" onclick="toggleHabit(${habit.id})">
+            ${isDone ? '✓' : ''}
+          </button>
+          <button class="delete-btn" onclick="deleteHabit(${habit.id})">✕</button>
+        </div>
+      </div>
+    `;
+    habitList.appendChild(card);
+  });
+}
+
+// Streak Calendar Logic
+calendarBtn.addEventListener('click', () => {
+  renderCalendar();
+  calendarModal.classList.add('active');
+});
+
+closeModalBtn.addEventListener('click', () => {
+  calendarModal.classList.remove('active');
+});
+
+function renderCalendar() {
+  calendarGrid.innerHTML = '';
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  document.getElementById('calendar-month-title').innerText = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  dayNames.forEach(d => {
+    const header = document.createElement('div');
+    header.className = 'cal-day-header';
+    header.innerText = d;
+    calendarGrid.appendChild(header);
+  });
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateObj = new Date(year, month, day);
+    const dateStr = getFormattedDate(dateObj);
+    const isToday = dateStr === todayStr;
+
+    // Stats calculation for date
+    let totalHabits = habits.length;
+    let completedCount = 0;
+    habits.forEach(h => {
+      if (h.history[dateStr]) completedCount++;
+    });
+
+    const cell = document.createElement('div');
+    cell.className = `cal-cell ${isToday ? 'today' : ''}`;
+    cell.innerText = day;
+
+    if (totalHabits > 0 && completedCount > 0) {
+      const statusDot = document.createElement('div');
+      statusDot.className = `status-dot ${completedCount === totalHabits ? 'full' : 'partial'}`;
+      cell.appendChild(statusDot);
+    }
+
+    cell.addEventListener('click', () => {
+      document.querySelectorAll('.cal-cell').forEach(c => c.classList.remove('selected'));
+      cell.classList.add('selected');
+      document.getElementById('selected-date-text').innerText = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      document.getElementById('selected-stats-text').innerText = `Completed ${completedCount} out of ${totalHabits} total habit${totalHabits === 1 ? '' : 's'}.`;
+    });
+
+    calendarGrid.appendChild(cell);
+  }
+}
+
+// Theme Toggle
+themeBtn.addEventListener('click', () => {
+  document.body.classList.toggle('dark-mode');
+  themeBtn.innerText = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+});
+
+saveAndRender();
