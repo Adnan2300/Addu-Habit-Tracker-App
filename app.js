@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let habits = JSON.parse(localStorage.getItem('my_habits')) || [];
   let activeCategory = 'All';
 
-  // Theme Init
+  // Theme Handling
   if (localStorage.getItem('theme') === 'light') {
     document.body.classList.add('light-mode');
     themeToggle.textContent = '☀️';
@@ -57,6 +57,33 @@ document.addEventListener('DOMContentLoaded', () => {
     return streak;
   }
 
+  function triggerConfetti() {
+    const container = document.getElementById('confetti-container');
+    const colors = ['#30d158', '#007aff', '#ff9500', '#ff2d55', '#af52de'];
+    for (let i = 0; i < 35; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random() * 100 + 'vw';
+      piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDuration = (1 + Math.random() * 0.8) + 's';
+      container.appendChild(piece);
+      setTimeout(() => piece.remove(), 2000);
+    }
+  }
+
+  function updateFilterBar() {
+    // Extract unique categories dynamically
+    const categories = ['All', ...new Set(habits.map(h => h.category).filter(Boolean))];
+    filterBar.innerHTML = '';
+    categories.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = `filter-btn ${cat === activeCategory ? 'active' : ''}`;
+      btn.dataset.category = cat;
+      btn.textContent = cat;
+      filterBar.appendChild(btn);
+    });
+  }
+
   function updateAnalytics() {
     document.getElementById('stat-total').textContent = habits.length;
     const completedToday = habits.filter(h => h.completedDates.includes(today)).length;
@@ -88,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function render() {
+    updateFilterBar();
     updateAnalytics();
     habitList.innerHTML = '';
 
@@ -95,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ? habits 
       : habits.filter(h => h.category === activeCategory);
 
-    filtered.forEach((habit, index) => {
+    filtered.forEach((habit) => {
       const realIndex = habits.indexOf(habit);
       const isCompletedToday = habit.completedDates.includes(today);
       const streak = calculateStreak(habit);
@@ -107,8 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <div>
             <span class="habit-title">${habit.name}</span>
             <div class="badges">
-              <span class="badge cat-${habit.category}">${habit.category}</span>
-              <span class="badge freq-badge">${habit.frequency || 'Daily'}</span>
+              <span class="badge">${habit.category}</span>
+              <span class="badge" style="opacity: 0.7">${habit.frequency}</span>
             </div>
           </div>
           <div class="card-actions">
@@ -123,17 +151,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Filter Bar Buttons
   filterBar.addEventListener('click', (e) => {
     if (e.target.classList.contains('filter-btn')) {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
       activeCategory = e.target.dataset.category;
       render();
     }
   });
 
-  // Export Data
   exportBtn.addEventListener('click', () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(habits));
     const downloadAnchor = document.createElement('a');
@@ -144,7 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadAnchor.remove();
   });
 
-  // Import Data
   importFile.addEventListener('change', (e) => {
     const fileReader = new FileReader();
     fileReader.onload = (event) => {
@@ -153,10 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Array.isArray(importedHabits)) {
           habits = importedHabits;
           saveHabits();
-          alert('Data restored successfully!');
         }
       } catch (err) {
-        alert('Invalid backup file format.');
+        alert('Invalid file format.');
       }
     };
     if (e.target.files[0]) fileReader.readAsText(e.target.files[0]);
@@ -165,8 +187,14 @@ document.addEventListener('DOMContentLoaded', () => {
   window.toggleHabit = (index) => {
     const habit = habits[index];
     const dateIdx = habit.completedDates.indexOf(today);
-    if (dateIdx > -1) habit.completedDates.splice(dateIdx, 1);
-    else habit.completedDates.push(today);
+    if (dateIdx > -1) {
+      habit.completedDates.splice(dateIdx, 1);
+    } else {
+      habit.completedDates.push(today);
+      // Trigger confetti if all habits completed today
+      const completedCount = habits.filter(h => h.completedDates.includes(today)).length;
+      if (completedCount === habits.length) triggerConfetti();
+    }
     saveHabits();
   };
 
@@ -178,14 +206,14 @@ document.addEventListener('DOMContentLoaded', () => {
   habitForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const name = habitInput.value.trim();
+    const category = habitCategory.value.trim() || 'General';
+    const frequency = habitFrequency.value.trim() || 'Daily';
+
     if (name) {
-      habits.push({
-        name,
-        category: habitCategory.value,
-        frequency: habitFrequency.value,
-        completedDates: []
-      });
+      habits.push({ name, category, frequency, completedDates: [] });
       habitInput.value = '';
+      habitCategory.value = '';
+      habitFrequency.value = '';
       saveHabits();
     }
   });
