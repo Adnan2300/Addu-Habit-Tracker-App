@@ -15,7 +15,7 @@
     <header>
       <div class="header-top">
         <div>
-          <h1>Habits</h1>
+          <h1>Habits 🎉</h1>
           <p id="current-date"></p>
         </div>
         <button id="theme-toggle" class="icon-btn" title="Toggle Theme">🌙</button>
@@ -38,33 +38,36 @@
       </div>
     </header>
 
-    <!-- Habit Creation Form -->
+    <!-- Habit Creation Form with Custom Tag Support -->
     <form id="add-habit-form">
       <input type="text" id="habit-input" placeholder="New habit name..." required>
       <div class="form-row">
-        <select id="habit-category">
-          <option value="Fitness"> Fitness</option>
-          <option value="Study"> Study</option>
-          <option value="Mindfulness"> Mindfulness</option>
-          <option value="Work"> Work</option>
-          <option value="General"> General</option>
-        </select>
-        <select id="habit-frequency">
-          <option value="Daily">Daily</option>
-          <option value="3x/week">3x / week</option>
-          <option value="Weekdays">Weekdays</option>
-        </select>
+        <!-- Custom or Select Category -->
+        <input type="text" id="habit-category" list="category-options" placeholder="Category (or type custom)" required>
+        <datalist id="category-options">
+          <option value="Fitness"></option>
+          <option value="Study"></option>
+          <option value="Mindfulness"></option>
+          <option value="Work"></option>
+          <option value="General"></option>
+        </datalist>
+
+        <!-- Custom or Select Duration/Frequency -->
+        <input type="text" id="habit-frequency" list="frequency-options" placeholder="Frequency" required>
+        <datalist id="frequency-options">
+          <option value="Daily"></option>
+          <option value="3x/week"></option>
+          <option value="Weekdays"></option>
+          <option value="Weekends"></option>
+        </datalist>
+
         <button type="submit" class="add-btn">+</button>
       </div>
     </form>
 
-    <!-- Category Filter Bar -->
+    <!-- Dynamic Category Filter Bar -->
     <div id="filter-bar" class="filter-bar">
       <button class="filter-btn active" data-category="All">All</button>
-      <button class="filter-btn" data-category="Fitness">Fitness</button>
-      <button class="filter-btn" data-category="Study">Study</button>
-      <button class="filter-btn" data-category="Mindfulness">Mindfulness</button>
-      <button class="filter-btn" data-category="Work">Work</button>
     </div>
 
     <!-- Habit Cards List -->
@@ -72,11 +75,13 @@
 
     <!-- Backup / Restore Controls -->
     <footer class="data-management">
-      <button id="export-btn" class="secondary-btn"> Export Data</button>
-      <label for="import-file" class="secondary-btn"> Restore Data</label>
+      <button id="export-btn" class="secondary-btn">📦 Export Data</button>
+      <label for="import-file" class="secondary-btn">📥 Restore Data</label>
       <input type="file" id="import-file" accept=".json" style="display: none;">
     </footer>
   </div>
+
+  <div id="confetti-container"></div>
 
   <script src="app.js"></script>
   <script>
