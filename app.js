@@ -10,6 +10,22 @@ const calendarModal = document.getElementById('calendar-modal');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const calendarGrid = document.getElementById('calendar-grid');
 
+const frequencySelect = document.getElementById('habit-frequency');
+const customFrequencyInput = document.getElementById('custom-frequency-input');
+
+// Toggle Custom Frequency Input visibility
+frequencySelect.addEventListener('change', () => {
+  if (frequencySelect.value === 'Custom') {
+    customFrequencyInput.classList.remove('hidden-field');
+    customFrequencyInput.required = true;
+    customFrequencyInput.focus();
+  } else {
+    customFrequencyInput.classList.add('hidden-field');
+    customFrequencyInput.required = false;
+    customFrequencyInput.value = '';
+  }
+});
+
 // Format date string as YYYY-MM-DD
 function getFormattedDate(dateObj = new Date()) {
   return dateObj.toISOString().split('T')[0];
@@ -27,7 +43,11 @@ habitForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const title = document.getElementById('habit-input').value.trim();
   const category = document.getElementById('habit-category').value.trim() || 'General';
-  const frequency = document.getElementById('habit-frequency').value;
+  
+  let frequency = frequencySelect.value;
+  if (frequency === 'Custom') {
+    frequency = customFrequencyInput.value.trim() || 'Custom';
+  }
 
   if (!title) return;
 
@@ -36,12 +56,15 @@ habitForm.addEventListener('submit', (e) => {
     title,
     category,
     frequency,
-    history: {} // Store "YYYY-MM-DD": true
+    history: {}
   };
 
   habits.push(newHabit);
   saveAndRender();
+  
   habitForm.reset();
+  customFrequencyInput.classList.add('hidden-field');
+  customFrequencyInput.required = false;
 });
 
 // Toggle Habit Completion
@@ -169,7 +192,6 @@ function renderCalendar() {
     const dateStr = getFormattedDate(dateObj);
     const isToday = dateStr === todayStr;
 
-    // Stats calculation for date
     let totalHabits = habits.length;
     let completedCount = 0;
     habits.forEach(h => {
