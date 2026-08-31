@@ -1,228 +1,343 @@
-let habits = JSON.parse(localStorage.getItem('habits_data')) || [];
-let activeFilter = 'All';
-
-// Elements
-const habitList = document.getElementById('habit-list');
-const habitForm = document.getElementById('add-habit-form');
-const calendarBtn = document.getElementById('calendar-btn');
-const themeBtn = document.getElementById('theme-btn');
-const calendarModal = document.getElementById('calendar-modal');
-const closeModalBtn = document.getElementById('close-modal-btn');
-const calendarGrid = document.getElementById('calendar-grid');
-
-const frequencySelect = document.getElementById('habit-frequency');
-const customFrequencyInput = document.getElementById('custom-frequency-input');
-
-// Toggle Custom Frequency Input visibility
-frequencySelect.addEventListener('change', () => {
-  if (frequencySelect.value === 'Custom') {
-    customFrequencyInput.classList.remove('hidden-field');
-    customFrequencyInput.required = true;
-    customFrequencyInput.focus();
-  } else {
-    customFrequencyInput.classList.add('hidden-field');
-    customFrequencyInput.required = false;
-    customFrequencyInput.value = '';
-  }
-});
-
-// Format date string as YYYY-MM-DD
-function getFormattedDate(dateObj = new Date()) {
-  return dateObj.toISOString().split('T')[0];
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
 }
 
-const todayStr = getFormattedDate();
+// Initial State from localStorage
+let habits = JSON.parse(localStorage.getItem('habits')) || [];
+let categories = JSON.parse(localStorage.getItem('categories')) || ['Health', 'Fitness', 'Productivity', 'Mindfulness'];
+let habitCharts = {};
+let categoryChart = null;
 
-// Initialize App
-document.getElementById('current-date').innerText = new Date().toLocaleDateString('en-US', {
-  weekday: 'long', month: 'short', day: 'numeric'
-});
+// Clock & Full Date Display
+function updateClockAndDate() {
+    const now = new Date();
+    
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    document.getElementById('clock').innerText = `${hours}:${minutes}:${seconds}.${ms}`;
 
-// Add Habit
-habitForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const title = document.getElementById('habit-input').value.trim();
-  const category = document.getElementById('habit-category').value.trim() || 'General';
-  
-  let frequency = frequencySelect.value;
-  if (frequency === 'Custom') {
-    frequency = customFrequencyInput.value.trim() || 'Custom';
-  }
+    const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+    document.getElementById('dateDisplay').innerText = now.toLocaleDateString('en-US', options);
+}
+setInterval(updateClockAndDate, 30);
 
-  if (!title) return;
+function toggleTheme() {
+    document.body.classList.toggle('dark-mode');
+}
 
-  const newHabit = {
-    id: Date.now(),
-    title,
-    category,
-    frequency,
-    history: {}
-  };
+function saveData() {
+    localStorage.setItem('habits', JSON.stringify(habits));
+    localStorage.setItem('categories', JSON.stringify(categories));
+}
 
-  habits.push(newHabit);
-  saveAndRender();
-  
-  habitForm.reset();
-  customFrequencyInput.classList.add('hidden-field');
-  customFrequencyInput.required = false;
-});
+function populateCategories() {
+    const datalist = document.getElementById('categoryOptions');
+    const filterSelect = document.getElementById('categoryFilter');
 
-// Toggle Habit Completion
-function toggleHabit(id) {
-  habits = habits.map(h => {
-    if (h.id === id) {
-      const updatedHistory = { ...h.history };
-      if (updatedHistory[todayStr]) {
-        delete updatedHistory[todayStr];
-      } else {
-        updatedHistory[todayStr] = true;
-      }
-      return { ...h, history: updatedHistory };
+    datalist.innerHTML = categories.map(c => `<option value="${c}">`).join('');
+    filterSelect.innerHTML = '<option value="All">All Categories</option>' + 
+        categories.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+// Modal Control
+function openAddModal() {
+    document.getElementById('addModal').classList.add('active');
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').classList.remove('active');
+}
+
+function openAnalyticsModal() {
+    document.getElementById('analyticsModal').classList.add('active');
+    renderDetailedAnalytics();
+}
+
+function closeAnalyticsModal() {
+    document.getElementById('analyticsModal').classList.remove('active');
+}
+
+function addHabit() {
+    const name = document.getElementById('newHabitName').value.trim();
+    const category = document.getElementById('newCategoryInput').value.trim() || 'General';
+    const color = document.getElementById('habitColor').value;
+
+    if (!name) return alert('Please enter a habit name.');
+
+    if (!categories.includes(category)) {
+        categories.push(category);
     }
-    return h;
-  });
-  saveAndRender();
+
+    const newHabit = {
+        id: Date.now(),
+        name,
+        category,
+        color,
+        logs: []
+    };
+
+    habits.push(newHabit);
+    saveData();
+
+    document.getElementById('newHabitName').value = '';
+    document.getElementById('newCategoryInput').value = '';
+
+    closeAddModal();
+    populateCategories();
+    renderAll();
 }
 
-// Delete Habit
-function deleteHabit(id) {
-  habits = habits.filter(h => h.id !== id);
-  saveAndRender();
-}
+function toggleHabitDay(habitId, dateStr, isFuture) {
+    if (isFuture) return; // Prevent checking future dates
 
-// Calculate Streaks
-function getStreak(history) {
-  let streak = 0;
-  let checkDate = new Date();
-  
-  while (true) {
-    const dateKey = getFormattedDate(checkDate);
-    if (history[dateKey]) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const index = habit.logs.indexOf(dateStr);
+    if (index > -1) {
+        habit.logs.splice(index, 1);
     } else {
-      break;
+        habit.logs.push(dateStr);
     }
-  }
-  return streak;
+
+    saveData();
+    renderAll();
 }
 
-// Save & Render
-function saveAndRender() {
-  localStorage.setItem('habits_data', JSON.stringify(habits));
-  renderAnalytics();
-  renderHabits();
+function deleteHabit(habitId) {
+    if (!confirm('Are you sure you want to delete this habit track?')) return;
+    habits = habits.filter(h => h.id !== habitId);
+    saveData();
+    renderAll();
 }
 
-function renderAnalytics() {
-  document.getElementById('stat-total').innerText = habits.length;
-  const completedToday = habits.filter(h => h.history[todayStr]).length;
-  document.getElementById('stat-completed').innerText = completedToday;
+// Streak Calculations: Returns { currentStreak, longestStreak }
+function calculateStreakStats(logs) {
+    if (!logs || logs.length === 0) return { currentStreak: 0, longestStreak: 0 };
 
-  let maxStreak = 0;
-  habits.forEach(h => {
-    const s = getStreak(h.history);
-    if (s > maxStreak) maxStreak = s;
-  });
-  document.getElementById('stat-streak').innerText = maxStreak;
+    // Unique sorted dates in ascending order
+    const sortedDatesAsc = [...new Set(logs)]
+        .map(d => new Date(d))
+        .sort((a, b) => a - b);
+
+    let maxStreak = 0;
+    let tempStreak = 0;
+
+    // Calculate Longest Streak anywhere in history
+    for (let i = 0; i < sortedDatesAsc.length; i++) {
+        if (i === 0) {
+            tempStreak = 1;
+        } else {
+            const diffDays = Math.round((sortedDatesAsc[i] - sortedDatesAsc[i - 1]) / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) {
+                tempStreak++;
+            } else if (diffDays > 1) {
+                tempStreak = 1;
+            }
+        }
+        if (tempStreak > maxStreak) {
+            maxStreak = tempStreak;
+        }
+    }
+
+    // Calculate Current Active Streak
+    const sortedDatesDesc = [...new Set(logs)]
+        .map(d => new Date(d))
+        .sort((a, b) => b - a);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const mostRecent = new Date(sortedDatesDesc[0]);
+    mostRecent.setHours(0, 0, 0, 0);
+
+    let currentStreak = 0;
+    if (mostRecent >= yesterday) {
+        let checkDate = mostRecent;
+        for (let i = 0; i < sortedDatesDesc.length; i++) {
+            const currentDate = new Date(sortedDatesDesc[i]);
+            currentDate.setHours(0, 0, 0, 0);
+
+            if (currentDate.getTime() === checkDate.getTime()) {
+                currentStreak++;
+                checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+    }
+
+    return {
+        currentStreak,
+        longestStreak: maxStreak
+    };
 }
 
 function renderHabits() {
-  habitList.innerHTML = '';
-  const filtered = activeFilter === 'All' ? habits : habits.filter(h => h.category === activeFilter);
+    const search = document.getElementById('searchFilter').value.toLowerCase();
+    const category = document.getElementById('categoryFilter').value;
 
-  filtered.forEach(habit => {
-    const isDone = !!habit.history[todayStr];
-    const streak = getStreak(habit.history);
+    const filtered = habits.filter(h => {
+        const matchesSearch = h.name.toLowerCase().includes(search);
+        const matchesCat = category === 'All' || h.category === category;
+        return matchesSearch && matchesCat;
+    });
 
-    const card = document.createElement('div');
-    card.className = 'habit-card';
-    card.innerHTML = `
-      <div class="card-header">
-        <div>
-          <div class="habit-title">${habit.title}</div>
-          <div class="badges">
-            <span class="badge">${habit.category}</span>
-            <span class="badge">${habit.frequency}</span>
-            <span class="badge">🔥 ${streak}d streak</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button class="check-btn ${isDone ? 'completed' : ''}" onclick="toggleHabit(${habit.id})">
-            ${isDone ? '✓' : ''}
-          </button>
-          <button class="delete-btn" onclick="deleteHabit(${habit.id})">✕</button>
-        </div>
-      </div>
-    `;
-    habitList.appendChild(card);
-  });
+    const container = document.getElementById('habitsList');
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const todayStr = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    container.innerHTML = filtered.map(h => {
+        let monthColumnsHtml = '';
+        const streakStats = calculateStreakStats(h.logs);
+        const totalCompletions = h.logs.length;
+        
+        months.forEach((mName, mIdx) => {
+            const daysInMonth = new Date(currentYear, mIdx + 1, 0).getDate();
+            let dayBoxesHtml = '';
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${currentYear}-${String(mIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const isDone = h.logs.includes(dateStr);
+                const isFuture = dateStr > todayStr;
+
+                dayBoxesHtml += `<div class="day-box ${isDone ? 'active' : ''} ${isFuture ? 'future-disabled' : ''}" 
+                    style="${isDone ? `background:${h.color} !important;` : ''}"
+                    title="${isFuture ? dateStr + ' (Future date - locked)' : dateStr}" 
+                    onclick="toggleHabitDay(${h.id}, '${dateStr}', ${isFuture})"></div>`;
+            }
+
+            monthColumnsHtml += `
+                <div class="month-column">
+                    <div class="month-name">${mName}</div>
+                    <div class="days-flex">${dayBoxesHtml}</div>
+                </div>
+            `;
+        });
+
+        return `
+            <div class="habit-card">
+                <div class="habit-header">
+                    <div class="habit-title-wrapper">
+                        <strong style="font-size:1rem; margin-right:4px;">${h.name}</strong>
+                        <span class="tag-badge">${h.category}</span>
+                        <span class="count-badge" title="Total Completions">✔ ${totalCompletions} total</span>
+                        <span class="streak-badge ${streakStats.currentStreak > 0 ? 'active-streak' : ''}" title="Current Consecutive Streak">🔥 ${streakStats.currentStreak}d current</span>
+                        <span class="streak-badge longest-streak" title="Longest Historical Streak">🏆 ${streakStats.longestStreak}d best</span>
+                    </div>
+                    <button onclick="deleteHabit(${h.id})" class="delete-icon-btn">🗑</button>
+                </div>
+                <div class="year-grid">${monthColumnsHtml}</div>
+            </div>
+        `;
+    }).join('');
 }
 
-// Streak Calendar Logic
-calendarBtn.addEventListener('click', () => {
-  renderCalendar();
-  calendarModal.classList.add('active');
-});
+function renderMetrics() {
+    let total = 0;
+    habits.forEach(h => total += h.logs.length);
 
-closeModalBtn.addEventListener('click', () => {
-  calendarModal.classList.remove('active');
-});
+    document.getElementById('totalCompletions').innerText = total;
+    document.getElementById('activeHabitsCount').innerText = habits.length;
+}
 
-function renderCalendar() {
-  calendarGrid.innerHTML = '';
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+// Detailed Data Visualizations (Modal View)
+function renderDetailedAnalytics() {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
 
-  document.getElementById('calendar-month-title').innerText = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-  dayNames.forEach(d => {
-    const header = document.createElement('div');
-    header.className = 'cal-day-header';
-    header.innerText = d;
-    calendarGrid.appendChild(header);
-  });
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateObj = new Date(year, month, day);
-    const dateStr = getFormattedDate(dateObj);
-    const isToday = dateStr === todayStr;
-
-    let totalHabits = habits.length;
-    let completedCount = 0;
+    // Tag / Category Breakdown (Pie Chart)
+    const categoryTotals = {};
     habits.forEach(h => {
-      if (h.history[dateStr]) completedCount++;
+        categoryTotals[h.category] = (categoryTotals[h.category] || 0) + h.logs.length;
     });
 
-    const cell = document.createElement('div');
-    cell.className = `cal-cell ${isToday ? 'today' : ''}`;
-    cell.innerText = day;
-
-    if (totalHabits > 0 && completedCount > 0) {
-      const statusDot = document.createElement('div');
-      statusDot.className = `status-dot ${completedCount === totalHabits ? 'full' : 'partial'}`;
-      cell.appendChild(statusDot);
-    }
-
-    cell.addEventListener('click', () => {
-      document.querySelectorAll('.cal-cell').forEach(c => c.classList.remove('selected'));
-      cell.classList.add('selected');
-      document.getElementById('selected-date-text').innerText = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      document.getElementById('selected-stats-text').innerText = `Completed ${completedCount} out of ${totalHabits} total habit${totalHabits === 1 ? '' : 's'}.`;
+    const catCtx = document.getElementById('categoryPieChart').getContext('2d');
+    if (categoryChart) categoryChart.destroy();
+    
+    categoryChart = new Chart(catCtx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(categoryTotals),
+            datasets: [{
+                data: Object.values(categoryTotals),
+                backgroundColor: ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#6366f1']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+        }
     });
 
-    calendarGrid.appendChild(cell);
-  }
+    // Individual Habit Visualizations
+    const habitsContainer = document.getElementById('individualHabitAnalytics');
+    habitsContainer.innerHTML = habits.map(h => `
+        <div class="individual-chart-card">
+            <div class="individual-chart-title">
+                <strong style="color:${h.color}">${h.name}</strong>
+                <span class="tag-badge">${h.category}</span>
+            </div>
+            <div class="individual-chart-wrapper">
+                <canvas id="chart-habit-${h.id}"></canvas>
+            </div>
+        </div>
+    `).join('');
+
+    // Render Each Habit's Monthly Chart
+    habits.forEach(h => {
+        const monthlyCounts = new Array(12).fill(0);
+        h.logs.forEach(dateStr => {
+            const parts = dateStr.split('-');
+            if (parseInt(parts[0]) === currentYear) {
+                const monthIndex = parseInt(parts[1]) - 1;
+                monthlyCounts[monthIndex]++;
+            }
+        });
+
+        const canvas = document.getElementById(`chart-habit-${h.id}`);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (habitCharts[h.id]) habitCharts[h.id].destroy();
+
+        habitCharts[h.id] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: 'Completions',
+                    data: monthlyCounts,
+                    backgroundColor: h.color,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    });
 }
 
-// Theme Toggle
-themeBtn.addEventListener('click', () => {
-  document.body.classList.toggle('dark-mode');
-  themeBtn.innerText = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
-});
+function renderAll() {
+    renderMetrics();
+    renderHabits();
+}
 
-saveAndRender();
+// Initial Setup
+populateCategories();
+renderAll();

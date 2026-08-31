@@ -1,90 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Habit Tracker</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Habit & Activity Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <div class="app-container">
+
+<div class="container">
     <header>
-      <div class="header-top">
-        <h1>Habits</h1>
-        <div class="header-actions">
-          <button id="calendar-btn" class="icon-btn" aria-label="Open Calendar">📅</button>
-          <button id="theme-btn" class="icon-btn" aria-label="Toggle Theme">🌙</button>
+        <div>
+            <h1>Habit Tracker</h1>
+            <div class="date-badge" id="dateDisplay">Loading date...</div>
         </div>
-      </div>
-      <p id="current-date">Today</p>
+        <div class="header-right">
+            <div class="clock-badge" id="clock">00:00:00.000</div>
+            <button class="icon-btn theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+        </div>
     </header>
 
-    <div class="analytics-card">
-      <div class="stat">
-        <span id="stat-total">0</span>
-        <label>Habits</label>
-      </div>
-      <div class="stat">
-        <span id="stat-completed">0</span>
-        <label>Completed</label>
-      </div>
-      <div class="stat">
-        <span id="stat-streak">0</span>
-        <label>Best Streak</label>
-      </div>
+    <!-- Top Summary Overview -->
+    <div class="fitness-grid">
+        <div class="fitness-card">
+            <div class="metric-val" id="totalCompletions">0</div>
+            <div class="metric-lbl">Total Completions</div>
+        </div>
+        <div class="fitness-card">
+            <div class="metric-val" id="activeHabitsCount">0</div>
+            <div class="metric-lbl">Active Tracks</div>
+        </div>
     </div>
 
-    <form id="add-habit-form">
-      <input type="text" id="habit-input" placeholder="New habit name..." required>
-      <div class="form-row">
-        <!-- Category input with pre-filled suggestions -->
-        <input type="text" id="habit-category" list="category-options" placeholder="Category (or select below)">
-        <datalist id="category-options">
-          <option value="Health">
-          <option value="Fitness">
-          <option value="Productivity">
-          <option value="Mindfulness">
-          <option value="Finance">
-        </datalist>
-
-        <!-- Frequency options with custom choice -->
-        <select id="habit-frequency">
-          <option value="Daily">Daily</option>
-          <option value="Weekly">Weekly</option>
-          <option value="Monthly">Monthly</option>
-          <option value="Custom">Custom...</option>
-        </select>
-
-        <button type="submit" class="add-btn">+</button>
-      </div>
-
-      <!-- Custom Frequency Field (revealed when Custom is chosen) -->
-      <input type="text" id="custom-frequency-input" class="hidden-field" placeholder="Enter custom schedule (e.g. 3x a week, Every Mon/Thu)">
-    </form>
-
-    <div class="filter-bar" id="filter-bar">
-      <button class="filter-btn active" data-filter="All">All</button>
+    <!-- Discrete Controls & Action Row -->
+    <div class="toolbar">
+        <div class="search-filter-wrapper">
+            <input type="text" id="searchFilter" placeholder="🔍 Search..." oninput="renderHabits()">
+            <select id="categoryFilter" onchange="renderHabits()">
+                <option value="All">All Categories</option>
+            </select>
+        </div>
+        <button class="secondary-btn" onclick="openAnalyticsModal()">📊 Analytics</button>
     </div>
 
-    <div id="habit-list"></div>
-  </div>
+    <!-- Habits List -->
+    <div id="habitsList"></div>
+</div>
 
-  <!-- Streak Calendar Modal -->
-  <div id="calendar-modal" class="modal-overlay">
+<!-- Floating Action Button (+ New Habit) -->
+<button class="fab" onclick="openAddModal()" title="Add New Habit">+</button>
+
+<!-- Add Habit Modal Popup -->
+<div class="modal-overlay" id="addModal">
     <div class="modal-card">
-      <div class="modal-header">
-        <h2 id="calendar-month-title">Streak Calendar</h2>
-        <button id="close-modal-btn" class="close-btn">✕</button>
-      </div>
-      <div class="calendar-grid" id="calendar-grid"></div>
-      <div class="cal-details-card">
-        <h4 id="selected-date-text">Select a day</h4>
-        <p id="selected-stats-text">Tap any date to inspect completion performance.</p>
-      </div>
-    </div>
-  </div>
+        <div class="modal-header">
+            <h3>New Activity Track</h3>
+            <button class="close-btn" onclick="closeAddModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <label class="input-label">Habit Name</label>
+            <input type="text" id="newHabitName" placeholder="e.g., Morning Workout, Read 20 pages...">
+            
+            <label class="input-label">Category Tag</label>
+            <input type="text" id="newCategoryInput" list="categoryOptions" placeholder="Select or type a category...">
+            <datalist id="categoryOptions"></datalist>
 
-  <script src="app.js"></script>
+            <label class="input-label">Track Accent Color</label>
+            <input type="color" id="habitColor" value="#8b5cf6" class="color-picker">
+        </div>
+        <div class="modal-footer">
+            <button class="secondary-btn" onclick="closeAddModal()">Cancel</button>
+            <button class="primary-btn" onclick="addHabit()">Create Track</button>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Visual Analytics Modal -->
+<div class="modal-overlay" id="analyticsModal">
+    <div class="modal-card modal-large">
+        <div class="modal-header">
+            <h3>Visual Analytics Dashboard</h3>
+            <button class="close-btn" onclick="closeAnalyticsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="analytics-section-title">Completions by Tag / Category</div>
+            <div class="category-chart-wrapper">
+                <canvas id="categoryPieChart"></canvas>
+            </div>
+
+            <div class="analytics-section-title">Individual Activity Breakdowns (Monthly Totals)</div>
+            <div class="individual-charts-grid" id="individualHabitAnalytics"></div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

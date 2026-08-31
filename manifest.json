@@ -1,18 +1,13 @@
 {
-  "name": "Habit Tracker",
+  "name": "Habit & Activity Tracker",
   "short_name": "Habits",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#0f0d1b",
+  "theme_color": "#8b5cf6",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192/30d158/000000?text=Habits",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "https://via.placeholder.com/512/30d158/000000?text=Habits",
+      "src": "https://cdn-icons-png.flaticon.com/512/3209/3209995.png",
       "sizes": "512x512",
       "type": "image/png"
     }
