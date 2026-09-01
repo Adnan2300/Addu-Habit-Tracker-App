@@ -153,7 +153,7 @@ button.secondary-btn {
     white-space: nowrap;
 }
 
-/* Habit Card & Streaks */
+/* Habit Card, Drag & Drop & Action Controls */
 .habit-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -161,6 +161,28 @@ button.secondary-btn {
     padding: 16px;
     margin-bottom: 16px;
     box-shadow: var(--shadow);
+    transition: transform 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.habit-card.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+}
+
+.habit-card.drag-over {
+    border: 2px dashed var(--accent-purple);
+}
+
+.drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    user-select: none;
+    margin-right: 4px;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
 }
 
 .habit-header {
@@ -175,6 +197,30 @@ button.secondary-btn {
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.action-icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background-color 0.15s;
+}
+
+.action-icon-btn:hover {
+    background: var(--accent-light);
+}
+
+.action-icon-btn.delete-btn {
+    color: #ef4444;
 }
 
 .tag-badge {
@@ -222,14 +268,6 @@ body.dark-mode .streak-badge.active-streak {
 body.dark-mode .streak-badge.longest-streak {
     background: #075985;
     color: #bae6fd;
-}
-
-.delete-icon-btn {
-    background: transparent;
-    color: #ef4444;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
 }
 
 .year-grid {

@@ -8,6 +8,8 @@ let habits = JSON.parse(localStorage.getItem('habits')) || [];
 let categories = JSON.parse(localStorage.getItem('categories')) || ['Health', 'Fitness', 'Productivity', 'Mindfulness'];
 let habitCharts = {};
 let categoryChart = null;
+let editingHabitId = null;
+let draggedItemIndex = null;
 
 // Clock & Full Date Display
 function updateClockAndDate() {
@@ -35,20 +37,41 @@ function saveData() {
 
 function populateCategories() {
     const datalist = document.getElementById('categoryOptions');
+    const editDatalist = document.getElementById('editCategoryOptions');
     const filterSelect = document.getElementById('categoryFilter');
 
-    datalist.innerHTML = categories.map(c => `<option value="${c}">`).join('');
+    const catOptionsHtml = categories.map(c => `<option value="${c}">`).join('');
+    datalist.innerHTML = catOptionsHtml;
+    if (editDatalist) editDatalist.innerHTML = catOptionsHtml;
+
     filterSelect.innerHTML = '<option value="All">All Categories</option>' + 
         categories.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
-// Modal Control
+// Modal Controls
 function openAddModal() {
     document.getElementById('addModal').classList.add('active');
 }
 
 function closeAddModal() {
     document.getElementById('addModal').classList.remove('active');
+}
+
+function openEditModal(habitId) {
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    editingHabitId = habitId;
+    document.getElementById('editHabitName').value = habit.name;
+    document.getElementById('editCategoryInput').value = habit.category;
+    document.getElementById('editHabitColor').value = habit.color;
+
+    document.getElementById('editModal').classList.add('active');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+    editingHabitId = null;
 }
 
 function openAnalyticsModal() {
@@ -60,6 +83,7 @@ function closeAnalyticsModal() {
     document.getElementById('analyticsModal').classList.remove('active');
 }
 
+// CRUD Actions
 function addHabit() {
     const name = document.getElementById('newHabitName').value.trim();
     const category = document.getElementById('newCategoryInput').value.trim() || 'General';
@@ -90,8 +114,34 @@ function addHabit() {
     renderAll();
 }
 
+function saveEditHabit() {
+    if (!editingHabitId) return;
+
+    const habit = habits.find(h => h.id === editingHabitId);
+    if (!habit) return;
+
+    const newName = document.getElementById('editHabitName').value.trim();
+    const newCategory = document.getElementById('editCategoryInput').value.trim() || 'General';
+    const newColor = document.getElementById('editHabitColor').value;
+
+    if (!newName) return alert('Habit name cannot be empty.');
+
+    if (!categories.includes(newCategory)) {
+        categories.push(newCategory);
+    }
+
+    habit.name = newName;
+    habit.category = newCategory;
+    habit.color = newColor;
+
+    saveData();
+    closeEditModal();
+    populateCategories();
+    renderAll();
+}
+
 function toggleHabitDay(habitId, dateStr, isFuture) {
-    if (isFuture) return; // Prevent checking future dates
+    if (isFuture) return;
 
     const habit = habits.find(h => h.id === habitId);
     if (!habit) return;
@@ -114,11 +164,52 @@ function deleteHabit(habitId) {
     renderAll();
 }
 
-// Streak Calculations: Returns { currentStreak, longestStreak }
+// Drag & Drop Reordering Handlers
+function handleDragStart(e, index) {
+    draggedItemIndex = index;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dragging');
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDragEnter(e) {
+    const card = e.target.closest('.habit-card');
+    if (card) card.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    const card = e.target.closest('.habit-card');
+    if (card) card.classList.remove('drag-over');
+}
+
+function handleDrop(e, targetIndex) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedItemIndex === null || draggedItemIndex === targetIndex) return;
+
+    // Reorder habits array
+    const draggedItem = habits.splice(draggedItemIndex, 1)[0];
+    habits.splice(targetIndex, 0, draggedItem);
+
+    draggedItemIndex = null;
+    saveData();
+    renderHabits();
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.habit-card').forEach(card => card.classList.remove('drag-over'));
+}
+
+// Streak Calculations
 function calculateStreakStats(logs) {
     if (!logs || logs.length === 0) return { currentStreak: 0, longestStreak: 0 };
 
-    // Unique sorted dates in ascending order
     const sortedDatesAsc = [...new Set(logs)]
         .map(d => new Date(d))
         .sort((a, b) => a - b);
@@ -126,7 +217,6 @@ function calculateStreakStats(logs) {
     let maxStreak = 0;
     let tempStreak = 0;
 
-    // Calculate Longest Streak anywhere in history
     for (let i = 0; i < sortedDatesAsc.length; i++) {
         if (i === 0) {
             tempStreak = 1;
@@ -143,7 +233,6 @@ function calculateStreakStats(logs) {
         }
     }
 
-    // Calculate Current Active Streak
     const sortedDatesDesc = [...new Set(logs)]
         .map(d => new Date(d))
         .sort((a, b) => b - a);
@@ -173,21 +262,12 @@ function calculateStreakStats(logs) {
         }
     }
 
-    return {
-        currentStreak,
-        longestStreak: maxStreak
-    };
+    return { currentStreak, longestStreak: maxStreak };
 }
 
 function renderHabits() {
     const search = document.getElementById('searchFilter').value.toLowerCase();
     const category = document.getElementById('categoryFilter').value;
-
-    const filtered = habits.filter(h => {
-        const matchesSearch = h.name.toLowerCase().includes(search);
-        const matchesCat = category === 'All' || h.category === category;
-        return matchesSearch && matchesCat;
-    });
 
     const container = document.getElementById('habitsList');
     const now = new Date();
@@ -195,7 +275,15 @@ function renderHabits() {
     const todayStr = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    container.innerHTML = filtered.map(h => {
+    // Check if filtering is active (disable reordering UI when filtered)
+    const isFiltered = search !== '' || category !== 'All';
+
+    container.innerHTML = habits.map((h, index) => {
+        const matchesSearch = h.name.toLowerCase().includes(search);
+        const matchesCat = category === 'All' || h.category === category;
+
+        if (!matchesSearch || !matchesCat) return '';
+
         let monthColumnsHtml = '';
         const streakStats = calculateStreakStats(h.logs);
         const totalCompletions = h.logs.length;
@@ -224,16 +312,27 @@ function renderHabits() {
         });
 
         return `
-            <div class="habit-card">
+            <div class="habit-card" 
+                draggable="${!isFiltered}" 
+                ondragstart="handleDragStart(event, ${index})"
+                ondragover="handleDragOver(event)"
+                ondragenter="handleDragEnter(event)"
+                ondragleave="handleDragLeave(event)"
+                ondrop="handleDrop(event, ${index})"
+                ondragend="handleDragEnd(event)">
                 <div class="habit-header">
                     <div class="habit-title-wrapper">
+                        ${!isFiltered ? `<span class="drag-handle" title="Drag to reorder">⋮⋮</span>` : ''}
                         <strong style="font-size:1rem; margin-right:4px;">${h.name}</strong>
                         <span class="tag-badge">${h.category}</span>
                         <span class="count-badge" title="Total Completions">✔ ${totalCompletions} total</span>
                         <span class="streak-badge ${streakStats.currentStreak > 0 ? 'active-streak' : ''}" title="Current Consecutive Streak">🔥 ${streakStats.currentStreak}d current</span>
                         <span class="streak-badge longest-streak" title="Longest Historical Streak">🏆 ${streakStats.longestStreak}d best</span>
                     </div>
-                    <button onclick="deleteHabit(${h.id})" class="delete-icon-btn">🗑</button>
+                    <div class="action-buttons">
+                        <button onclick="openEditModal(${h.id})" class="action-icon-btn" title="Edit Habit">✏️</button>
+                        <button onclick="deleteHabit(${h.id})" class="action-icon-btn delete-btn" title="Delete Habit">🗑</button>
+                    </div>
                 </div>
                 <div class="year-grid">${monthColumnsHtml}</div>
             </div>
@@ -249,12 +348,11 @@ function renderMetrics() {
     document.getElementById('activeHabitsCount').innerText = habits.length;
 }
 
-// Detailed Data Visualizations (Modal View)
+// Detailed Data Visualizations Modal
 function renderDetailedAnalytics() {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
 
-    // Tag / Category Breakdown (Pie Chart)
     const categoryTotals = {};
     habits.forEach(h => {
         categoryTotals[h.category] = (categoryTotals[h.category] || 0) + h.logs.length;
@@ -279,7 +377,6 @@ function renderDetailedAnalytics() {
         }
     });
 
-    // Individual Habit Visualizations
     const habitsContainer = document.getElementById('individualHabitAnalytics');
     habitsContainer.innerHTML = habits.map(h => `
         <div class="individual-chart-card">
@@ -293,7 +390,6 @@ function renderDetailedAnalytics() {
         </div>
     `).join('');
 
-    // Render Each Habit's Monthly Chart
     habits.forEach(h => {
         const monthlyCounts = new Array(12).fill(0);
         h.logs.forEach(dateStr => {
@@ -325,9 +421,7 @@ function renderDetailedAnalytics() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { precision: 0 } }
-                }
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
             }
         });
     });

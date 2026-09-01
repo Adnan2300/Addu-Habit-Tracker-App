@@ -79,6 +79,31 @@
     </div>
 </div>
 
+<!-- Edit Habit Modal Popup -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Edit Activity Track</h3>
+            <button class="close-btn" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <label class="input-label">Habit Name</label>
+            <input type="text" id="editHabitName" placeholder="Update habit name...">
+            
+            <label class="input-label">Category Tag</label>
+            <input type="text" id="editCategoryInput" list="editCategoryOptions" placeholder="Select or type a category...">
+            <datalist id="editCategoryOptions"></datalist>
+
+            <label class="input-label">Track Accent Color</label>
+            <input type="color" id="editHabitColor" class="color-picker">
+        </div>
+        <div class="modal-footer">
+            <button class="secondary-btn" onclick="closeEditModal()">Cancel</button>
+            <button class="primary-btn" onclick="saveEditHabit()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
 <!-- Detailed Visual Analytics Modal -->
 <div class="modal-overlay" id="analyticsModal">
     <div class="modal-card modal-large">
