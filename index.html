@@ -45,6 +45,7 @@
             </select>
         </div>
         <button class="secondary-btn" onclick="openAnalyticsModal()">📊 Analytics</button>
+        <button class="secondary-btn" onclick="openBackupModal()">💾 Backup</button>
     </div>
 
     <!-- Habits List -->
@@ -119,6 +120,26 @@
 
             <div class="analytics-section-title">Individual Activity Breakdowns (Monthly Totals)</div>
             <div class="individual-charts-grid" id="individualHabitAnalytics"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Backup & Restore Modal -->
+<div class="modal-overlay" id="backupModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Backup &amp; Restore</h3>
+            <button class="close-btn" onclick="closeBackupModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="backupStatus" style="margin-top:0; font-size:0.9rem;"></p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="primary-btn" onclick="exportBackup()">⬆️ Export backup file</button>
+                <button class="secondary-btn" onclick="copyBackupToClipboard()">📋 Copy backup as text</button>
+                <button class="secondary-btn" onclick="document.getElementById('importFile').click()">⬇️ Import backup file</button>
+                <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importBackupFile(event)">
+            </div>
+            <p style="font-size:0.75rem; opacity:0.8; margin-bottom:0;">Importing replaces the data currently in the app. A safety copy of the current data is kept automatically.</p>
         </div>
     </div>
 </div>

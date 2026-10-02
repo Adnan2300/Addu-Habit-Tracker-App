@@ -432,6 +432,123 @@ function renderAll() {
     renderHabits();
 }
 
+// ===== Backup & Restore =====
+function openBackupModal() {
+    const totalLogs = habits.reduce((sum, h) => sum + h.logs.length, 0);
+    document.getElementById('backupStatus').innerText =
+        `Currently stored in this app: ${habits.length} habits, ${totalLogs} completions.`;
+    document.getElementById('backupModal').classList.add('active');
+}
+
+function closeBackupModal() {
+    document.getElementById('backupModal').classList.remove('active');
+}
+
+function buildBackupObject() {
+    return {
+        app: 'habit-tracker',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        habits,
+        categories,
+        // Raw copy of everything stored by this app, as an extra safety net
+        rawStorage: Object.fromEntries(
+            Object.keys(localStorage).map(k => [k, localStorage.getItem(k)])
+        )
+    };
+}
+
+async function exportBackup() {
+    const json = JSON.stringify(buildBackupObject(), null, 2);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const fileName = `habit-tracker-backup-${stamp}.json`;
+
+    // Preferred on iPhone: share sheet -> "Save to Files"
+    try {
+        const file = new File([json], fileName, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: fileName });
+            return;
+        }
+    } catch (err) {
+        if (err && err.name === 'AbortError') return; // user closed the share sheet
+        console.log('Share failed, falling back to download:', err);
+    }
+
+    // Fallback: normal file download
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function copyBackupToClipboard() {
+    try {
+        await navigator.clipboard.writeText(JSON.stringify(buildBackupObject(), null, 2));
+        alert('Backup copied. Paste it into Notes or a message to yourself and keep it safe.');
+    } catch (err) {
+        alert('Could not copy automatically. Please use "Export backup file" instead.');
+    }
+}
+
+function importBackupFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const data = JSON.parse(reader.result);
+            if (!data || !Array.isArray(data.habits)) throw new Error('No habits found');
+            const valid = data.habits.every(h =>
+                h && typeof h.name === 'string' && Array.isArray(h.logs) && h.id !== undefined);
+            if (!valid) throw new Error('Habit entries are malformed');
+
+            const importedCats = Array.isArray(data.categories) ? data.categories : [];
+            const totalLogs = data.habits.reduce((sum, h) => sum + h.logs.length, 0);
+
+            const ok = confirm(
+                `This backup contains ${data.habits.length} habits and ${totalLogs} completions.\n\n` +
+                `Importing will REPLACE the data currently in the app. ` +
+                `A safety copy of the current data is saved automatically.\n\nContinue?`
+            );
+            if (!ok) return;
+
+            localStorage.setItem('habits_before_import', JSON.stringify({
+                savedAt: new Date().toISOString(),
+                habits,
+                categories
+            }));
+
+            habits = data.habits;
+            categories = importedCats.length ? importedCats : categories;
+            habits.forEach(h => {
+                if (h.category && !categories.includes(h.category)) categories.push(h.category);
+            });
+
+            saveData();
+            populateCategories();
+            renderAll();
+            closeBackupModal();
+            alert('Import complete.');
+        } catch (err) {
+            alert('That file is not a valid backup. Nothing was changed.');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// Ask the browser to protect stored data from automatic cleanup
+if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {});
+}
+
 // Initial Setup
 populateCategories();
 renderAll();
