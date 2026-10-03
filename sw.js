@@ -1,4 +1,4 @@
-const CACHE_NAME = 'habit-tracker-v5';
+const CACHE_NAME = 'habit-tracker-v6';
 const LOCAL_ASSETS = [
   './',
   './index.html',
@@ -30,7 +30,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache'})
       .then(response => {
         if (response && response.status === 200) {
           const copy = response.clone();
