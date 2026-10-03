@@ -116,16 +116,25 @@
 <div class="modal-overlay" id="analyticsModal">
     <div class="modal-card modal-large">
         <div class="modal-header">
-            <h3>Visual Analytics Dashboard</h3>
+            <h3 id="analyticsTitle">Analytics</h3>
             <button class="close-btn" onclick="closeAnalyticsModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="analytics-section-title">Completions by Tag / Category</div>
-            <div class="category-chart-wrapper">
-                <canvas id="categoryPieChart"></canvas>
-            </div>
+            <div id="statCards" class="stat-grid"></div>
 
-            <div class="analytics-section-title">Individual Activity Breakdowns (Monthly Totals)</div>
+            <div class="analytics-section-title">Year activity (all habits)</div>
+            <div id="heatmapWrap" class="heat-scroll"></div>
+
+            <div class="analytics-section-title">Monthly trend</div>
+            <div class="chart-box"><canvas id="trendChart"></canvas></div>
+
+            <div class="analytics-section-title">Best days of the week</div>
+            <div class="chart-box short"><canvas id="weekdayChart"></canvas></div>
+
+            <div class="analytics-section-title">Completions by category</div>
+            <div class="category-chart-wrapper"><canvas id="categoryPieChart"></canvas></div>
+
+            <div class="analytics-section-title">Each habit</div>
             <div class="individual-charts-grid" id="individualHabitAnalytics"></div>
         </div>
     </div>

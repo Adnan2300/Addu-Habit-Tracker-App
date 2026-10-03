@@ -383,81 +383,156 @@ function renderMetrics() {
     document.getElementById('activeHabitsCount').innerText = habits.length;
 }
 
-// Detailed Data Visualizations Modal
+// ===== Analytics =====
+let trendChart = null, weekdayChart = null;
+const DAY_MS = 86400000;
+const p2 = n => String(n).padStart(2, '0');
+
+function yearLogs(h) { return h.logs.filter(d => d.startsWith(viewYear + '-')); }
+
+// Days a habit has existed inside [from, to] (never counts days before it was created / first logged)
+function trackedDays(h, from, to) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let start = new Date(h.id);
+    if (isNaN(start)) start = new Date(0);
+    start.setHours(0, 0, 0, 0);
+    h.logs.forEach(d => { const x = new Date(d + 'T00:00:00'); if (x < start) start = x; });
+    const f = start > from ? start : from;
+    const t = today < to ? today : to;
+    return t < f ? 0 : Math.round((t - f) / DAY_MS) + 1;
+}
+
+function pct(n, d) { return d ? Math.min(100, Math.round(100 * n / d)) : 0; }
+
 function renderDetailedAnalytics() {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentYear = viewYear;
+    const now = new Date();
+    const thisYear = now.getFullYear(), thisMonth = now.getMonth();
+    const todayStr = `${thisYear}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
+    const cs = getComputedStyle(document.body);
+    Chart.defaults.color = cs.getPropertyValue('--text-muted').trim() || '#888';
+    Chart.defaults.borderColor = 'rgba(128,128,128,0.2)';
+    const accent = cs.getPropertyValue('--accent-purple').trim() || '#8b5cf6';
+    const yStart = new Date(viewYear, 0, 1), yEnd = new Date(viewYear, 11, 31);
+    document.getElementById('analyticsTitle').innerText = `Analytics · ${viewYear}`;
 
-    const categoryTotals = {};
-    habits.forEach(h => {
-        categoryTotals[h.category] = (categoryTotals[h.category] || 0) + h.logs.length;
+    const stats = habits.map(h => {
+        const logs = yearLogs(h);
+        const tracked = trackedDays(h, yStart, yEnd);
+        const st = calculateStreakStats(h.logs);
+        return { h, logs, count: logs.length, tracked, rate: pct(logs.length, tracked), cur: st.currentStreak, best: st.longestStreak };
+    });
+    const totalYear = stats.reduce((a, s) => a + s.count, 0);
+    const yearRate = pct(totalYear, stats.reduce((a, s) => a + s.tracked, 0));
+
+    const monthCounts = new Array(12).fill(0);
+    stats.forEach(s => s.logs.forEach(d => monthCounts[parseInt(d.slice(5, 7), 10) - 1]++));
+
+    let monthLabel, monthValue;
+    if (viewYear === thisYear) {
+        const mS = new Date(thisYear, thisMonth, 1), mE = new Date(thisYear, thisMonth + 1, 0);
+        monthLabel = 'This month';
+        monthValue = pct(monthCounts[thisMonth], habits.reduce((a, h) => a + trackedDays(h, mS, mE), 0)) + '%';
+    } else {
+        monthLabel = 'Best month';
+        monthValue = totalYear ? months[monthCounts.indexOf(Math.max(...monthCounts))] : '–';
+    }
+    const bestCur = stats.reduce((a, s) => s.cur > (a ? a.cur : 0) ? s : a, null);
+    const bestEver = stats.reduce((a, s) => s.best > (a ? a.best : 0) ? s : a, null);
+    const consistent = stats.filter(s => s.tracked > 0).sort((a, b) => b.rate - a.rate)[0];
+
+    const cards = [
+        [totalYear, `Completions in ${viewYear}`, ''],
+        [yearRate + '%', 'Overall completion rate', ''],
+        [monthValue, monthLabel, ''],
+        [(bestCur ? bestCur.cur : 0) + 'd', 'Best current streak', bestCur ? bestCur.h.name : ''],
+        [(bestEver ? bestEver.best : 0) + 'd', 'Longest streak ever', bestEver ? bestEver.h.name : ''],
+        [consistent ? consistent.rate + '%' : '–', 'Most consistent', consistent ? consistent.h.name : '']
+    ];
+    document.getElementById('statCards').innerHTML = cards.map(c =>
+        `<div class="stat-card"><div class="stat-value">${c[0]}</div><div class="stat-label">${c[1]}</div><div class="stat-sub">${c[2]}</div></div>`
+    ).join('');
+
+    // Year heatmap (all habits combined)
+    const dayCounts = {};
+    habits.forEach(h => yearLogs(h).forEach(d => dayCounts[d] = (dayCounts[d] || 0) + 1));
+    let cells = '<div class="heat-cell empty"></div>'.repeat(yStart.getDay());
+    for (let t = new Date(yStart); t <= yEnd; t.setDate(t.getDate() + 1)) {
+        const ds = `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}`;
+        const n = dayCounts[ds] || 0;
+        const lvl = ds > todayStr ? 'future' : n === 0 ? '0' : Math.min(4, Math.ceil(4 * n / habits.length));
+        cells += `<div class="heat-cell l${lvl}" title="${ds}: ${n}/${habits.length} habits"></div>`;
+    }
+    const heatWrap = document.getElementById('heatmapWrap');
+    heatWrap.innerHTML = `<div class="heat-grid">${cells}</div>`;
+    if (viewYear === thisYear) {
+        const col = Math.floor((yStart.getDay() + Math.round((new Date(thisYear, thisMonth, now.getDate()) - yStart) / DAY_MS)) / 7);
+        heatWrap.scrollLeft = Math.max(0, col * 16 - heatWrap.clientWidth + 60);
+    } else heatWrap.scrollLeft = 0;
+
+    // Monthly trend (+ previous year for comparison)
+    const prev = new Array(12).fill(0);
+    habits.forEach(h => h.logs.forEach(d => { if (d.startsWith((viewYear - 1) + '-')) prev[parseInt(d.slice(5, 7), 10) - 1]++; }));
+    const datasets = [{
+        label: String(viewYear), tension: 0.35, fill: true, borderColor: accent,
+        backgroundColor: 'rgba(139,92,246,0.18)', pointRadius: 3,
+        data: monthCounts.map((v, i) => viewYear === thisYear && i > thisMonth ? null : v)
+    }];
+    if (prev.some(v => v > 0)) datasets.push({
+        label: String(viewYear - 1), tension: 0.35, borderColor: '#94a3b8',
+        borderDash: [5, 5], pointRadius: 0, data: prev
+    });
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), {
+        type: 'line', data: { labels: months, datasets },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: datasets.length > 1 } } }
     });
 
-    const catCtx = document.getElementById('categoryPieChart').getContext('2d');
+    // Weekday breakdown
+    const wd = new Array(7).fill(0);
+    stats.forEach(s => s.logs.forEach(d => wd[new Date(d + 'T00:00:00').getDay()]++));
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    if (weekdayChart) weekdayChart.destroy();
+    weekdayChart = new Chart(document.getElementById('weekdayChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], datasets: [{ data: order.map(i => wd[i]), backgroundColor: accent, borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+
+    // Category split
+    const catTotals = {};
+    stats.forEach(s => catTotals[s.h.category] = (catTotals[s.h.category] || 0) + s.count);
     if (categoryChart) categoryChart.destroy();
-    
-    categoryChart = new Chart(catCtx, {
+    categoryChart = new Chart(document.getElementById('categoryPieChart').getContext('2d'), {
         type: 'doughnut',
-        data: {
-            labels: Object.keys(categoryTotals),
-            datasets: [{
-                data: Object.values(categoryTotals),
-                backgroundColor: ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#6366f1']
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } }
-        }
+        data: { labels: Object.keys(catTotals), datasets: [{ data: Object.values(catTotals), backgroundColor: ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#6366f1', '#14b8a6', '#f43f5e'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
     });
 
-    const habitsContainer = document.getElementById('individualHabitAnalytics');
-    habitsContainer.innerHTML = habits.map(h => `
+    // Per-habit cards
+    document.getElementById('individualHabitAnalytics').innerHTML = stats.map(s => `
         <div class="individual-chart-card">
             <div class="individual-chart-title">
-                <strong style="color:${h.color}">${h.name}</strong>
-                <span class="tag-badge">${h.category}</span>
+                <strong style="color:${s.h.color}">${s.h.name}</strong>
+                <span class="tag-badge">${s.h.category}</span>
             </div>
-            <div class="individual-chart-wrapper">
-                <canvas id="chart-habit-${h.id}"></canvas>
+            <div class="habit-chips">
+                <span class="count-badge">${s.count} in ${viewYear}</span>
+                <span class="count-badge">${s.rate}% rate</span>
+                <span class="streak-badge active-streak">🔥 ${s.cur}d</span>
+                <span class="streak-badge longest-streak">🏆 ${s.best}d</span>
             </div>
-        </div>
-    `).join('');
+            <div class="individual-chart-wrapper"><canvas id="chart-habit-${s.h.id}"></canvas></div>
+        </div>`).join('');
 
-    habits.forEach(h => {
-        const monthlyCounts = new Array(12).fill(0);
-        h.logs.forEach(dateStr => {
-            const parts = dateStr.split('-');
-            if (parseInt(parts[0]) === currentYear) {
-                const monthIndex = parseInt(parts[1]) - 1;
-                monthlyCounts[monthIndex]++;
-            }
-        });
-
-        const canvas = document.getElementById(`chart-habit-${h.id}`);
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        if (habitCharts[h.id]) habitCharts[h.id].destroy();
-
-        habitCharts[h.id] = new Chart(ctx, {
+    stats.forEach(s => {
+        const counts = new Array(12).fill(0);
+        s.logs.forEach(d => counts[parseInt(d.slice(5, 7), 10) - 1]++);
+        if (habitCharts[s.h.id]) habitCharts[s.h.id].destroy();
+        habitCharts[s.h.id] = new Chart(document.getElementById(`chart-habit-${s.h.id}`).getContext('2d'), {
             type: 'bar',
-            data: {
-                labels: months,
-                datasets: [{
-                    label: 'Completions',
-                    data: monthlyCounts,
-                    backgroundColor: h.color,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-            }
+            data: { labels: months, datasets: [{ data: counts, backgroundColor: s.h.color, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
         });
     });
 }
