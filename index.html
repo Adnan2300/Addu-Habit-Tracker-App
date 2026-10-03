@@ -10,7 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
+<body class="dark-mode">
 
 <div class="container">
     <header>
@@ -19,7 +19,7 @@
             <div class="date-badge" id="dateDisplay">Loading date...</div>
         </div>
         <div class="header-right">
-            <div class="clock-badge" id="clock">00:00:00.000</div>
+            <div class="clock-badge" id="clock">00:00:00</div>
             <button class="icon-btn theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
         </div>
     </header>
@@ -38,14 +38,21 @@
 
     <!-- Discrete Controls & Action Row -->
     <div class="toolbar">
-        <div class="search-filter-wrapper">
-            <input type="text" id="searchFilter" placeholder="🔍 Search..." oninput="renderHabits()">
+        <input type="text" id="searchFilter" class="search-input" placeholder="🔍 Search habits..." oninput="renderHabits()">
+        <div class="toolbar-row">
             <select id="categoryFilter" onchange="renderHabits()">
                 <option value="All">All Categories</option>
             </select>
+            <div class="year-switch">
+                <button id="prevYearBtn" onclick="changeYear(-1)" aria-label="Previous year">‹</button>
+                <span id="yearLabel">2026</span>
+                <button id="nextYearBtn" onclick="changeYear(1)" aria-label="Next year">›</button>
+            </div>
         </div>
-        <button class="secondary-btn" onclick="openAnalyticsModal()">📊 Analytics</button>
-        <button class="secondary-btn" onclick="openBackupModal()">💾 Backup</button>
+        <div class="toolbar-row">
+            <button class="secondary-btn" onclick="openAnalyticsModal()">📊 Analytics</button>
+            <button class="secondary-btn" onclick="openBackupModal()">💾 Backup</button>
+        </div>
     </div>
 
     <!-- Habits List -->
@@ -53,7 +60,7 @@
 </div>
 
 <!-- Floating Action Button (+ New Habit) -->
-<button class="fab" onclick="openAddModal()" title="Add New Habit">+</button>
+<button class="fab" onclick="openAddModal()" title="Add New Habit" aria-label="Add New Habit"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/></svg></button>
 
 <!-- Add Habit Modal Popup -->
 <div class="modal-overlay" id="addModal">

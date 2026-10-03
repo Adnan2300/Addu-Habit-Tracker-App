@@ -9,7 +9,11 @@ let categories = JSON.parse(localStorage.getItem('categories')) || ['Health', 'F
 let habitCharts = {};
 let categoryChart = null;
 let editingHabitId = null;
-let draggedItemIndex = null;
+let dragState = null;
+let viewYear = new Date().getFullYear();
+
+// Dark mode is the default; remember the last choice
+if (localStorage.getItem('habit_theme') === 'light') document.body.classList.remove('dark-mode');
 
 // Clock & Full Date Display
 function updateClockAndDate() {
@@ -18,16 +22,41 @@ function updateClockAndDate() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
-    const ms = String(now.getMilliseconds()).padStart(3, '0');
-    document.getElementById('clock').innerText = `${hours}:${minutes}:${seconds}.${ms}`;
+    document.getElementById('clock').innerText = `${hours}:${minutes}:${seconds}`;
 
     const options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
     document.getElementById('dateDisplay').innerText = now.toLocaleDateString('en-US', options);
 }
-setInterval(updateClockAndDate, 30);
+updateClockAndDate();
+setInterval(updateClockAndDate, 1000);
 
 function toggleTheme() {
-    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.toggle('dark-mode');
+    try { localStorage.setItem('habit_theme', isDark ? 'dark' : 'light'); } catch (e) {}
+}
+
+// Year navigation
+function getMinYear() {
+    let min = new Date().getFullYear();
+    habits.forEach(h => h.logs.forEach(d => {
+        const y = parseInt(d.slice(0, 4), 10);
+        if (y && y < min) min = y;
+    }));
+    return min;
+}
+
+function updateYearControls() {
+    document.getElementById('yearLabel').innerText = viewYear;
+    document.getElementById('nextYearBtn').disabled = viewYear >= new Date().getFullYear();
+    document.getElementById('prevYearBtn').disabled = viewYear <= getMinYear();
+}
+
+function changeYear(delta) {
+    const next = viewYear + delta;
+    if (next > new Date().getFullYear() || next < getMinYear()) return;
+    viewYear = next;
+    updateYearControls();
+    renderHabits(true);
 }
 
 function saveData() {
@@ -164,46 +193,39 @@ function deleteHabit(habitId) {
     renderAll();
 }
 
-// Drag & Drop Reordering Handlers
-function handleDragStart(e, index) {
-    draggedItemIndex = index;
-    e.dataTransfer.effectAllowed = 'move';
-    e.target.classList.add('dragging');
-}
-
-function handleDragOver(e) {
+// Touch + mouse reordering (hold the ⋮⋮ handle and drag)
+function startHandleDrag(e, index) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    const card = e.currentTarget.closest('.habit-card');
+    dragState = { index, target: index, card };
+    card.classList.add('dragging');
+    e.currentTarget.setPointerCapture(e.pointerId);
 }
 
-function handleDragEnter(e) {
-    const card = e.target.closest('.habit-card');
-    if (card) card.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-    const card = e.target.closest('.habit-card');
-    if (card) card.classList.remove('drag-over');
-}
-
-function handleDrop(e, targetIndex) {
+function moveHandleDrag(e) {
+    if (!dragState) return;
     e.preventDefault();
-    e.stopPropagation();
+    document.querySelectorAll('.habit-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const over = el && el.closest('.habit-card');
+    if (over && over !== dragState.card) {
+        over.classList.add('drag-over');
+        dragState.target = Number(over.dataset.index);
+    }
+    if (e.clientY < 100) window.scrollBy(0, -14);
+    else if (e.clientY > window.innerHeight - 100) window.scrollBy(0, 14);
+}
 
-    if (draggedItemIndex === null || draggedItemIndex === targetIndex) return;
-
-    // Reorder habits array
-    const draggedItem = habits.splice(draggedItemIndex, 1)[0];
-    habits.splice(targetIndex, 0, draggedItem);
-
-    draggedItemIndex = null;
-    saveData();
+function endHandleDrag() {
+    if (!dragState) return;
+    const { index, target } = dragState;
+    dragState = null;
+    if (target !== index) {
+        const item = habits.splice(index, 1)[0];
+        habits.splice(target, 0, item);
+        saveData();
+    }
     renderHabits();
-}
-
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    document.querySelectorAll('.habit-card').forEach(card => card.classList.remove('drag-over'));
 }
 
 // Streak Calculations
@@ -265,46 +287,52 @@ function calculateStreakStats(logs) {
     return { currentStreak, longestStreak: maxStreak };
 }
 
-function renderHabits() {
+function renderHabits(resetScroll = false) {
     const search = document.getElementById('searchFilter').value.toLowerCase();
     const category = document.getElementById('categoryFilter').value;
 
     const container = document.getElementById('habitsList');
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const todayStr = `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth();
+    const todayStr = `${thisYear}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    // Check if filtering is active (disable reordering UI when filtered)
     const isFiltered = search !== '' || category !== 'All';
+
+    // Remember each card's sideways scroll so tapping a day doesn't make it jump
+    const savedScroll = {};
+    container.querySelectorAll('.habit-card').forEach(card => {
+        const grid = card.querySelector('.year-grid');
+        if (grid) savedScroll[card.dataset.id] = grid.scrollLeft;
+    });
 
     container.innerHTML = habits.map((h, index) => {
         const matchesSearch = h.name.toLowerCase().includes(search);
         const matchesCat = category === 'All' || h.category === category;
-
         if (!matchesSearch || !matchesCat) return '';
 
         let monthColumnsHtml = '';
         const streakStats = calculateStreakStats(h.logs);
         const totalCompletions = h.logs.length;
-        
+
         months.forEach((mName, mIdx) => {
-            const daysInMonth = new Date(currentYear, mIdx + 1, 0).getDate();
+            const daysInMonth = new Date(viewYear, mIdx + 1, 0).getDate();
+            const isCurrent = viewYear === thisYear && mIdx === thisMonth;
             let dayBoxesHtml = '';
 
             for (let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${currentYear}-${String(mIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dateStr = `${viewYear}-${String(mIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const isDone = h.logs.includes(dateStr);
                 const isFuture = dateStr > todayStr;
 
-                dayBoxesHtml += `<div class="day-box ${isDone ? 'active' : ''} ${isFuture ? 'future-disabled' : ''}" 
+                dayBoxesHtml += `<div class="day-box ${isDone ? 'active' : ''} ${isFuture ? 'future-disabled' : ''} ${dateStr === todayStr ? 'today' : ''}"
                     style="${isDone ? `background:${h.color} !important;` : ''}"
-                    title="${isFuture ? dateStr + ' (Future date - locked)' : dateStr}" 
-                    onclick="toggleHabitDay(${h.id}, '${dateStr}', ${isFuture})"></div>`;
+                    title="${isFuture ? dateStr + ' (Future date - locked)' : dateStr}"
+                    onclick="toggleHabitDay(${h.id}, '${dateStr}', ${isFuture})"><span>${d}</span></div>`;
             }
 
             monthColumnsHtml += `
-                <div class="month-column">
+                <div class="month-column ${isCurrent ? 'current-month' : ''}">
                     <div class="month-name">${mName}</div>
                     <div class="days-flex">${dayBoxesHtml}</div>
                 </div>
@@ -312,18 +340,15 @@ function renderHabits() {
         });
 
         return `
-            <div class="habit-card" 
-                draggable="${!isFiltered}" 
-                ondragstart="handleDragStart(event, ${index})"
-                ondragover="handleDragOver(event)"
-                ondragenter="handleDragEnter(event)"
-                ondragleave="handleDragLeave(event)"
-                ondrop="handleDrop(event, ${index})"
-                ondragend="handleDragEnd(event)">
+            <div class="habit-card" data-id="${h.id}" data-index="${index}">
                 <div class="habit-header">
                     <div class="habit-title-wrapper">
-                        ${!isFiltered ? `<span class="drag-handle" title="Drag to reorder">⋮⋮</span>` : ''}
-                        <strong style="font-size:1rem; margin-right:4px;">${h.name}</strong>
+                        ${!isFiltered ? `<span class="drag-handle" title="Hold and drag to reorder"
+                            onpointerdown="startHandleDrag(event, ${index})"
+                            onpointermove="moveHandleDrag(event)"
+                            onpointerup="endHandleDrag(event)"
+                            onpointercancel="endHandleDrag(event)">⋮⋮</span>` : ''}
+                        <strong style="font-size:1.1rem; margin-right:4px;">${h.name}</strong>
                         <span class="tag-badge">${h.category}</span>
                         <span class="count-badge" title="Total Completions">✔ ${totalCompletions} total</span>
                         <span class="streak-badge ${streakStats.currentStreak > 0 ? 'active-streak' : ''}" title="Current Consecutive Streak">🔥 ${streakStats.currentStreak}d current</span>
@@ -338,6 +363,16 @@ function renderHabits() {
             </div>
         `;
     }).join('');
+
+    // Open each card on the current month (or keep the previous scroll position)
+    container.querySelectorAll('.habit-card').forEach(card => {
+        const grid = card.querySelector('.year-grid');
+        if (!grid) return;
+        const saved = resetScroll ? undefined : savedScroll[card.dataset.id];
+        if (saved !== undefined) { grid.scrollLeft = saved; return; }
+        const target = grid.querySelector('.current-month');
+        if (target) grid.scrollLeft = Math.max(0, target.offsetLeft - 4);
+    });
 }
 
 function renderMetrics() {
@@ -351,7 +386,7 @@ function renderMetrics() {
 // Detailed Data Visualizations Modal
 function renderDetailedAnalytics() {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentYear = new Date().getFullYear();
+    const currentYear = viewYear;
 
     const categoryTotals = {};
     habits.forEach(h => {
@@ -550,5 +585,6 @@ if (navigator.storage && navigator.storage.persist) {
 }
 
 // Initial Setup
+updateYearControls();
 populateCategories();
 renderAll();

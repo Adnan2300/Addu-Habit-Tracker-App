@@ -473,3 +473,72 @@ body.dark-mode .streak-badge.longest-streak {
     position: relative;
     height: 150px;
 }
+
+/* ===== Batch 1: iPhone-first layout ===== */
+body {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+    padding-left: calc(env(safe-area-inset-left, 0px) + 14px);
+    padding-right: calc(env(safe-area-inset-right, 0px) + 14px);
+}
+h1 { font-size: 1.5rem; }
+.date-badge { font-size: 0.9rem; }
+.clock-badge { font-size: 0.95rem; padding: 8px 12px; }
+.icon-btn { width: 44px; height: 44px; font-size: 1.2rem; }
+.metric-val { font-size: 1.8rem; }
+.metric-lbl { font-size: 0.85rem; }
+
+.toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+.search-input, .toolbar select {
+    width: 100%; min-height: 46px; background: var(--card-bg);
+    border: 1px solid var(--card-border); color: var(--text-main);
+    padding: 10px 16px; border-radius: 23px; font-size: 1rem; outline: none;
+}
+.toolbar-row { display: flex; gap: 10px; align-items: stretch; }
+.toolbar-row select { flex: 1; min-width: 0; }
+.toolbar-row .secondary-btn { flex: 1; min-height: 46px; font-size: 0.95rem; }
+.year-switch {
+    display: flex; align-items: center; background: var(--card-bg);
+    border: 1px solid var(--card-border); border-radius: 23px; padding: 0 4px;
+}
+.year-switch button {
+    background: none; border: none; color: var(--accent-purple);
+    font-size: 1.7rem; width: 40px; height: 44px; cursor: pointer;
+}
+.year-switch button:disabled { opacity: 0.25; cursor: default; }
+.year-switch span { font-weight: 700; min-width: 46px; text-align: center; }
+
+.habit-card { padding: 16px 14px; }
+.tag-badge, .count-badge, .streak-badge { font-size: 0.8rem; padding: 4px 10px; }
+.action-icon-btn {
+    font-size: 1.25rem; width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+}
+.drag-handle {
+    touch-action: none; font-size: 1.5rem; line-height: 1;
+    padding: 8px; cursor: grab; user-select: none; -webkit-user-select: none;
+}
+.habit-card.dragging { opacity: 0.5; transform: scale(0.98); }
+
+.year-grid { position: relative; gap: 10px; }
+.month-column {
+    flex: 0 0 auto; min-width: 0; padding: 8px; border-radius: 12px;
+    border: 2px solid transparent;
+}
+.month-column.current-month { border-color: var(--accent-purple); }
+.month-column.current-month .month-name { color: var(--accent-purple); }
+.month-name { font-size: 0.85rem; margin-bottom: 6px; }
+.days-flex { grid-template-rows: repeat(7, 28px); gap: 4px; }
+.day-box {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+}
+.day-box span {
+    font-size: 0.62rem; font-weight: 600; opacity: 0.4;
+    pointer-events: none; user-select: none; -webkit-user-select: none;
+}
+.day-box.active span { color: #fff; opacity: 0.8; text-shadow: 0 0 2px rgba(0, 0, 0, 0.4); }
+.day-box.today { outline: 2px solid var(--accent-purple); outline-offset: 1px; }
+
+.fab { width: 60px; height: 60px; padding: 0; font-size: 0; }
+.fab svg { display: block; }
+.modal-body input[type="text"] { font-size: 1rem; }
