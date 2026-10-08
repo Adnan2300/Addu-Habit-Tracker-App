@@ -1,10 +1,13 @@
-const CACHE_NAME = 'habit-tracker-v7';
+const CACHE_NAME = 'habit-tracker-v8';
 const LOCAL_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './icon-180.png',
+  './icon-192.png',
+  './icon-512.png'
 ];
 const CHART_URL = 'https://cdn.jsdelivr.net/npm/chart.js';
 
